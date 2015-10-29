@@ -666,6 +666,13 @@ config CHARGER_BQ24190
 	help
 	  Say Y to enable support for the TI BQ24190 battery charger.
 
+config CHARGER_BQ24261
+	tristate "TI BQ24261 charger driver"
+	depends on I2C && EXTCON
+	help
+	  Say Y here to enable support for TI BQ24261 battery charger.
+
+
 config CHARGER_BQ24257
 	tristate "TI BQ24250/24251/24257 battery charger driver"
 	depends on I2C
