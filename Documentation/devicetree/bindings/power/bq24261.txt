@@ -1,0 +1,34 @@
+Binding for TI bq24261 Li-Ion Charger
+
+Required properties:
+- compatible: Should contain one of the following:
+    * "ti,bq24261"
+- reg: integer, i2c address of the device.
+- ti,battery-regulation-voltage: integer, maximum charging voltage in uV.
+- ti,charge-current: integer, maximum charging current in uA.
+- ti,termination-current: integer, charge will be terminated when current in
+    constant-voltage phase drops below this value (in uA).
+
+Optional properties:
+- ti,max-charge-current: integer, maximum charging current (in uA);
+- ti,max-charge-voltage: integer, maximum charging voltage (in uV);
+- ti,min-charge-temperature: integer, minimum charging temperature (in DegC);
+- ti,max-charge-temperature: integer, maximum charging temperature (in DegC).
+- ti,thermal-sensing: integer, enable(1) or disable(0) JEITA thermal control.
+
+Example:
+
+bq24261 {
+        compatible = "ti,bq24261";
+        reg = <0x6b>;
+
+        ti,battery-regulation-voltage = <4200>;
+        ti,charge-current = <1000>;
+        ti,termination-current = <128>;
+
+        ti,max-charge-current = <3000>;
+        ti,max-charge-voltage = <4350>;
+        ti,min-charge-temperature = <0>;
+        ti,max-charge-temperature = <60>;
+        ti,thermal-sensing = <1>;
+};
