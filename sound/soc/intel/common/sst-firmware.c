@@ -183,8 +183,8 @@ err:
 	return ret;
 }
 
-static struct dw_dma_chip *dw_probe(struct device *dev, struct resource *mem,
-	int irq)
+static struct dw_dma_chip *dw_probe(struct device *dev, int id,
+	struct resource *mem, int irq)
 {
 	struct dw_dma_chip *chip;
 	int err;
@@ -193,7 +193,6 @@ static struct dw_dma_chip *dw_probe(struct device *dev, struct resource *mem,
 	if (!chip)
 		return ERR_PTR(-ENOMEM);
 
-	chip->irq = irq;
 	chip->regs = devm_ioremap_resource(dev, mem);
 	if (IS_ERR(chip->regs))
 		return ERR_CAST(chip->regs);
@@ -203,6 +202,8 @@ static struct dw_dma_chip *dw_probe(struct device *dev, struct resource *mem,
 		return ERR_PTR(err);
 
 	chip->dev = dev;
+	chip->id = id;
+	chip->irq = irq;
 
 	err = dw_dma_probe(chip);
 	if (err)
@@ -305,7 +306,7 @@ static int sst_dma_new(struct sst_dsp *sst)
 	mem.flags = IORESOURCE_MEM;
 
 	/* now register DMA engine device */
-	dma->chip = dw_probe(sst->dma_dev, &mem, sst_pdata->irq);
+	dma->chip = dw_probe(sst->dma_dev, (int)sst->id, &mem, sst_pdata->irq);
 	if (IS_ERR(dma->chip)) {
 		dev_err(sst->dev, "error: DMA device register failed\n");
 		ret = PTR_ERR(dma->chip);
