@@ -18,6 +18,7 @@
  * actually exists, otherwise return all 1s for reads and bit bucket
  * the writes.
  */
+#define DEBUG
 
 #include <linux/sched.h>
 #include <linux/pci.h>
@@ -268,6 +269,7 @@ static int intel_mid_pci_irq_enable(struct pci_dev *dev)
 	dev->irq = ret;
 	dev->irq_managed = 1;
 
+	dev_info(&dev->dev, "Mapped GSI%d to IRQ%d\n", gsi, dev->irq);
 	return 0;
 }
 

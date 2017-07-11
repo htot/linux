@@ -20,7 +20,7 @@
  */
 
 /* Uncomment next line to get verbose printout */
-/* #define DEBUG */
+#define DEBUG
 #define pr_fmt(fmt) "ACPI: " fmt
 
 #include <linux/init.h>

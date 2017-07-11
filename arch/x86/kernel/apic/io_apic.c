@@ -30,6 +30,7 @@
  *	setup for the read already. We cache the data now, so that
  *	workaround has been removed.
  */
+#define DEBUG
 
 #include <linux/mm.h>
 #include <linux/interrupt.h>

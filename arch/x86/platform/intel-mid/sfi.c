@@ -10,6 +10,8 @@
  * of the License.
  */
 
+#define DEBUG
+
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/interrupt.h>

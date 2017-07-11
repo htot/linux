@@ -23,6 +23,8 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
+#define DEBUG
+
 #include <linux/init.h>
 #include <linux/acpi.h>
 #include <linux/acpi_pmtmr.h>
