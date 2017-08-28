@@ -80,6 +80,9 @@ static int __init bt_sfi_init(void)
 	struct bt_sfi_data *ddata;
 	int ret;
 
+	if (sfi_disabled)
+		return -EINVAL;
+
 	id = x86_match_cpu(bt_sfi_cpu_ids);
 	if (!id)
 		return -ENODEV;

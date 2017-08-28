@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/pm_wakeirq.h>
+#include <linux/sfi.h>
 #include <linux/slab.h>
 
 #include <asm/cpu_device_id.h>
@@ -125,6 +126,9 @@ static int mid_pb_probe(struct platform_device *pdev)
 	struct input_dev *input;
 	int irq = platform_get_irq(pdev, 0);
 	int error;
+
+	if (sfi_disabled)
+		return -ENODEV;
 
 	id = x86_match_cpu(mid_pb_cpu_ids);
 	if (!id)

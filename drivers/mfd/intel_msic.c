@@ -13,6 +13,7 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/intel_msic.h>
 #include <linux/platform_device.h>
+#include <linux/sfi.h>
 #include <linux/slab.h>
 
 #include <asm/intel_scu_ipc.h>
@@ -350,6 +351,9 @@ static int intel_msic_probe(struct platform_device *pdev)
 	struct resource *res;
 	u8 id0, id1;
 	int ret;
+
+	if (sfi_disabled)
+		return -ENODEV;
 
 	if (!pdata) {
 		dev_err(&pdev->dev, "no platform data passed\n");
