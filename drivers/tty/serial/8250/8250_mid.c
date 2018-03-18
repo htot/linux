@@ -97,6 +97,10 @@ static int tng_handle_irq(struct uart_port *p)
 	err = hsu_dma_get_status(chip, mid->dma_index * 2 + 1, &status);
 	if (err > 0) {
 		serial8250_rx_dma_flush(up);
+		/* immediately after flushing arm dma again on ttyS1 only */
+		if(mid->dma_index == 1) {
+			if (up->dma) up->dma->rx_dma(up);
+		}
 		ret |= 1;
 	} else if (err == 0)
 		ret |= hsu_dma_do_irq(chip, mid->dma_index * 2 + 1, status);
@@ -249,13 +253,18 @@ static int mid8250_startup(struct uart_port *port)
 
 	ret = serial8250_do_startup(port);
 	
-	/* allocate IO7 pin to toggle for ttyS1
-        */
-        if(mid->dma_index == 1) {
-            gpio_request(48, "ttyS1 INT");
-            gpio_direction_output(48, 0);
-        }
+	/* I want to arm rx dma at do_startup time for ttyS1 
+	   I need to register new do_startup and do_shutdown
+	   in mid8250_probe */
+	if(mid->dma_index == 1) {
 
+                /* allocate IO7 pin to toggle for ttyS1
+                */
+                gpio_request(48, "ttyS1 INT");
+                gpio_direction_output(48, 0);
+
+		if (up->dma) up->dma->rx_dma(up);
+	}
 	return ret;
 }
 
@@ -265,8 +274,11 @@ static void mid8250_shutdown(struct uart_port *port)
 	struct mid8250 *mid = port->private_data;
 
 	if(mid->dma_index == 1) {
-            gpio_free(48);
-        }
+
+                gpio_free(48);
+
+		serial8250_rx_dma_flush(up);
+	}
 
 	serial8250_do_shutdown(port);
 }
