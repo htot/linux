@@ -7,6 +7,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/gpio.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/rational.h>
@@ -83,6 +84,14 @@ static int tng_handle_irq(struct uart_port *p)
 	int err;
 
 	chip = pci_get_drvdata(mid->dma_dev);
+
+        /* On ttyS1 only toggle IO7 pin which corresponds to GP48*/
+        if(mid->dma_index == 1) {
+            if(gpio_is_valid(48)) {
+                gpio_set_value(48, 1);
+                gpio_set_value(48, 0);
+            };
+        }
 
 	/* Rx DMA */
 	err = hsu_dma_get_status(chip, mid->dma_index * 2 + 1, &status);
@@ -232,6 +241,36 @@ static void mid8250_set_termios(struct uart_port *p,
 	serial8250_do_set_termios(p, termios, old);
 }
 
+static int mid8250_startup(struct uart_port *port)
+{
+	struct uart_8250_port *up = up_to_u8250p(port);
+	struct mid8250 *mid = port->private_data;
+	int ret;
+
+	ret = serial8250_do_startup(port);
+	
+	/* allocate IO7 pin to toggle for ttyS1
+        */
+        if(mid->dma_index == 1) {
+            gpio_request(48, "ttyS1 INT");
+            gpio_direction_output(48, 0);
+        }
+
+	return ret;
+}
+
+static void mid8250_shutdown(struct uart_port *port)
+{
+	struct uart_8250_port *up = up_to_u8250p(port);
+	struct mid8250 *mid = port->private_data;
+
+	if(mid->dma_index == 1) {
+            gpio_free(48);
+        }
+
+	serial8250_do_shutdown(port);
+}
+
 static bool mid8250_dma_filter(struct dma_chan *chan, void *param)
 {
 	struct hsu_dma_slave *s = param;
@@ -306,6 +345,8 @@ static int mid8250_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	uart.port.uartclk = mid->board->base_baud * 16;
 	uart.port.flags = UPF_SHARE_IRQ | UPF_FIXED_PORT | UPF_FIXED_TYPE;
 	uart.port.set_termios = mid8250_set_termios;
+	uart.port.startup = mid8250_startup;
+	uart.port.shutdown = mid8250_shutdown;
 
 	uart.port.mapbase = pci_resource_start(pdev, bar);
 	uart.port.membase = pcim_iomap(pdev, bar, 0);
