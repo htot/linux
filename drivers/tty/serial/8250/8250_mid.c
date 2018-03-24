@@ -6,6 +6,7 @@
  * Author: Heikki Krogerus <heikki.krogerus@linux.intel.com>
  */
 
+#include <linux/delay.h>
 #include <linux/bitops.h>
 #include <linux/gpio.h>
 #include <linux/module.h>
@@ -82,6 +83,7 @@ static int tng_handle_irq(struct uart_port *p)
 	u32 status;
 	int ret = 0;
 	int err;
+	int rx_flushed = 0;
 
 	chip = pci_get_drvdata(mid->dma_dev);
 
@@ -97,10 +99,7 @@ static int tng_handle_irq(struct uart_port *p)
 	err = hsu_dma_get_status(chip, mid->dma_index * 2 + 1, &status);
 	if (err > 0) {
 		serial8250_rx_dma_flush(up);
-		/* immediately after flushing arm dma again on ttyS1 only */
-		if(mid->dma_index == 1) {
-			if (up->dma) up->dma->rx_dma(up);
-		}
+		rx_flushed = 1;
 		ret |= 1;
 	} else if (err == 0)
 		ret |= hsu_dma_do_irq(chip, mid->dma_index * 2 + 1, status);
@@ -114,6 +113,12 @@ static int tng_handle_irq(struct uart_port *p)
 
 	/* UART */
 	ret |= serial8250_handle_irq(p, serial_port_in(p, UART_IIR));
+
+	/* after flushing arm dma again on ttyS1 only */
+	if((rx_flushed == 1) && (mid->dma_index == 1)) {
+		udelay(20);
+		if (up->dma) up->dma->rx_dma(up);
+	}
 	return IRQ_RETVAL(ret);
 }
 
