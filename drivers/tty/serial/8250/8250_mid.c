@@ -116,10 +116,19 @@ static int tng_handle_irq(struct uart_port *p)
 
 	/* after flushing arm dma again on ttyS1 only */
 	if((rx_flushed == 1) && (mid->dma_index == 1)) {
-		udelay(20);
-		if (up->dma) up->dma->rx_dma(up);
+		schedule_work(&mid->dma.rx_workqueue);
 	}
 	return IRQ_RETVAL(ret);
+}
+
+void tng_restart_rx(struct work_struct *work) {
+	unsigned long flags;
+	struct uart_8250_dma *dma =
+		container_of(work, struct uart_8250_dma, rx_workqueue);
+	
+/*	spin_lock_irqsave(&dma->up->port.lock, flags); */
+	dma->rx_dma(dma->up);
+/*	spin_unlock_irqrestore(&dma->up->port.lock, flags); */
 }
 
 static int tng_setup(struct mid8250 *mid, struct uart_port *p)
@@ -329,6 +338,9 @@ static int mid8250_dma_setup(struct mid8250 *mid, struct uart_8250_port *port)
 	dma->fn = mid8250_dma_filter;
 	dma->rx_param = rx_param;
 	dma->tx_param = tx_param;
+	
+	dma->up = port;
+	INIT_WORK(&dma->rx_workqueue, tng_restart_rx);
 
 	port->dma = dma;
 	return 0;
