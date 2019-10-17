@@ -54,7 +54,6 @@
 static DEFINE_MUTEX(deferred_probe_mutex);
 static LIST_HEAD(deferred_probe_pending_list);
 static LIST_HEAD(deferred_probe_active_list);
-static atomic_t deferred_trigger_count = ATOMIC_INIT(0);
 static bool initcalls_done;
 
 /* Save the async probe drivers' name from kernel cmdline */
@@ -159,17 +158,6 @@ static bool driver_deferred_probe_enable = false;
  * This functions moves all devices from the pending list to the active
  * list and schedules the deferred probe workqueue to process them.  It
  * should be called anytime a driver is successfully bound to a device.
- *
- * Note, there is a race condition in multi-threaded probe. In the case where
- * more than one device is probing at the same time, it is possible for one
- * probe to complete successfully while another is about to defer. If the second
- * depends on the first, then it will get put on the pending list after the
- * trigger event has already occurred and will be stuck there.
- *
- * The atomic 'deferred_trigger_count' is used to determine if a successful
- * trigger has occurred in the midst of probing a driver. If the trigger count
- * changes in the midst of a probe, then deferred processing should be triggered
- * again.
  */
 static void driver_deferred_probe_trigger(void)
 {
@@ -182,7 +170,6 @@ static void driver_deferred_probe_trigger(void)
 	 * into the active list so they can be retried by the workqueue
 	 */
 	mutex_lock(&deferred_probe_mutex);
-	atomic_inc(&deferred_trigger_count);
 	list_splice_tail_init(&deferred_probe_pending_list,
 			      &deferred_probe_active_list);
 	mutex_unlock(&deferred_probe_mutex);
@@ -357,6 +344,19 @@ static void __exit deferred_probe_exit(void)
 }
 __exitcall(deferred_probe_exit);
 
+/*
+ * Note, there is a race condition in multi-threaded probe. In the case where
+ * more than one device is probing at the same time, it is possible for one
+ * probe to complete successfully while another is about to defer. If the second
+ * depends on the first, then it will get put on the pending list after the
+ * trigger event has already occurred and will be stuck there.
+ *
+ * The atomic 'probe_okay' is used to determine if a successful probe has
+ * occurred in the midst of probing another driver. If the count changes in
+ * the midst of a probe, then deferred processing should be triggered again.
+ */
+static atomic_t probe_okay = ATOMIC_INIT(0);
+
 /**
  * device_is_bound() - Check if device is bound to a driver
  * @dev: device to check
@@ -382,6 +382,7 @@ static void driver_bound(struct device *dev)
 	pr_debug("driver: '%s': %s: bound to device '%s'\n", dev->driver->name,
 		 __func__, dev_name(dev));
 
+	atomic_inc(&probe_okay);
 	klist_add_tail(&dev->p->knode_driver, &dev->driver->p->klist_devices);
 	device_links_driver_bound(dev);
 
@@ -774,7 +775,7 @@ static int __driver_probe_device(struct device_driver *drv, struct device *dev)
  */
 static int driver_probe_device(struct device_driver *drv, struct device *dev)
 {
-	int trigger_count = atomic_read(&deferred_trigger_count);
+	int local_probe_okay = atomic_read(&probe_okay);
 	int ret;
 
 	atomic_inc(&probe_count);
@@ -785,7 +786,7 @@ static int driver_probe_device(struct device_driver *drv, struct device *dev)
 		/*
 		 * Did a trigger occur while probing? Need to re-trigger if yes
 		 */
-		if (trigger_count != atomic_read(&deferred_trigger_count) &&
+		if (local_probe_okay != atomic_read(&probe_okay) &&
 		    !defer_all_probes)
 			driver_deferred_probe_trigger();
 	}
@@ -1216,6 +1217,13 @@ static void __device_release_driver(struct device *dev, struct device *parent)
 		dev_pm_set_driver_flags(dev, 0);
 
 		klist_remove(&dev->p->knode_driver);
+		/*
+		 * If a driver has been unbound from the device
+		 * we won't consider the probe of the device
+		 * successful.
+		 */
+		atomic_dec(&probe_okay);
+
 		device_pm_check_callbacks(dev);
 		if (dev->bus)
 			blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
