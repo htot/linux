@@ -414,16 +414,6 @@ struct uart_8250_port *serial8250_get_port(int line)
 }
 EXPORT_SYMBOL_GPL(serial8250_get_port);
 
-static void (*serial8250_isa_config)(int port, struct uart_port *up,
-	u32 *capabilities);
-
-void serial8250_set_isa_configurator(
-	void (*v)(int port, struct uart_port *up, u32 *capabilities))
-{
-	serial8250_isa_config = v;
-}
-EXPORT_SYMBOL(serial8250_set_isa_configurator);
-
 #ifdef CONFIG_SERIAL_8250_RSA
 
 static void univ8250_config_port(struct uart_port *port, int flags)
@@ -550,8 +540,6 @@ static void __init serial8250_isa_init_ports(void)
 		port->regshift = old_serial_port[i].iomem_reg_shift;
 
 		port->irqflags |= irqflag;
-		if (serial8250_isa_config != NULL)
-			serial8250_isa_config(i, &up->port, &up->capabilities);
 	}
 }
 
@@ -1084,10 +1072,6 @@ int serial8250_register_8250_port(struct uart_8250_port *up)
 			uart->dl_write = up->dl_write;
 
 		if (uart->port.type != PORT_8250_CIR) {
-			if (serial8250_isa_config != NULL)
-				serial8250_isa_config(0, &uart->port,
-						&uart->capabilities);
-
 			serial8250_apply_quirks(uart);
 			ret = uart_add_one_port(&serial8250_reg,
 						&uart->port);

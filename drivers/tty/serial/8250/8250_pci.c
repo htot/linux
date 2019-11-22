@@ -1420,22 +1420,6 @@ static int pci_pericom_setup_four_at_eight(struct serial_private *priv,
 }
 
 static int
-ce4100_serial_setup(struct serial_private *priv,
-		  const struct pciserial_board *board,
-		  struct uart_8250_port *port, int idx)
-{
-	int ret;
-
-	ret = setup_port(priv, port, idx, 0, board->reg_shift);
-	port->port.iotype = UPIO_MEM32;
-	port->port.type = PORT_XSCALE;
-	port->port.flags = (port->port.flags | UPF_FIXED_PORT | UPF_FIXED_TYPE);
-	port->port.regshift = 2;
-
-	return ret;
-}
-
-static int
 pci_omegapci_setup(struct serial_private *priv,
 		      const struct pciserial_board *board,
 		      struct uart_8250_port *port, int idx)
@@ -1826,7 +1810,6 @@ pci_moxa_setup(struct serial_private *priv,
 #define PCI_SUBDEVICE_ID_SIIG_DUAL_00	0x2500
 #define PCI_SUBDEVICE_ID_SIIG_DUAL_30	0x2530
 #define PCI_VENDOR_ID_ADVANTECH		0x13fe
-#define PCI_DEVICE_ID_INTEL_CE4100_UART 0x2e66
 #define PCI_DEVICE_ID_ADVANTECH_PCI3620	0x3620
 #define PCI_DEVICE_ID_ADVANTECH_PCI3618	0x3618
 #define PCI_DEVICE_ID_ADVANTECH_PCIf618	0xf618
@@ -1994,13 +1977,6 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
 		.setup		= skip_tx_en_setup,
-	},
-	{
-		.vendor		= PCI_VENDOR_ID_INTEL,
-		.device		= PCI_DEVICE_ID_INTEL_CE4100_UART,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-		.setup		= ce4100_serial_setup,
 	},
 	{
 		.vendor		= PCI_VENDOR_ID_INTEL,
@@ -2901,7 +2877,6 @@ enum pci_board_num_t {
 	pbn_ADDIDATA_PCIe_2_3906250,
 	pbn_ADDIDATA_PCIe_4_3906250,
 	pbn_ADDIDATA_PCIe_8_3906250,
-	pbn_ce4100_1_115200,
 	pbn_omegapci,
 	pbn_NETMOS9900_2s_115200,
 	pbn_brcm_trumanage,
@@ -3579,12 +3554,6 @@ static struct pciserial_board pci_boards[] = {
 		.base_baud	= 3906250,
 		.uart_offset	= 0x200,
 		.first_offset	= 0x1000,
-	},
-	[pbn_ce4100_1_115200] = {
-		.flags		= FL_BASE_BARS,
-		.num_ports	= 2,
-		.base_baud	= 921600,
-		.reg_shift      = 2,
 	},
 	[pbn_omegapci] = {
 		.flags		= FL_BASE0,
@@ -5516,10 +5485,6 @@ static const struct pci_device_id serial_pci_tbl[] = {
 	{	PCI_VENDOR_ID_NETMOS, PCI_DEVICE_ID_NETMOS_9865,
 		0xA000, 0x3004,
 		0, 0, pbn_b0_bt_4_115200 },
-	/* Intel CE4100 */
-	{	PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_CE4100_UART,
-		PCI_ANY_ID,  PCI_ANY_ID, 0, 0,
-		pbn_ce4100_1_115200 },
 
 	/*
 	 * Cronyx Omega PCI
