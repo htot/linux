@@ -102,9 +102,6 @@ enum fixed_addresses {
 #ifdef CONFIG_PARAVIRT
 	FIX_PARAVIRT_BOOTMAP,
 #endif
-#ifdef	CONFIG_X86_INTEL_MID
-	FIX_LNW_VRTC,
-#endif
 
 #ifdef CONFIG_ACPI_APEI_GHES
 	/* Used for GHES mapping from assorted contexts */
