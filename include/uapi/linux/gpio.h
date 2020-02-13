@@ -196,6 +196,12 @@ struct gpioevent_request {
  * struct gpioevent_data - The actual event being pushed to userspace
  * @timestamp: best estimate of time of event occurrence, in nanoseconds
  * @id: event identifier
+ *
+ * Warning! This structure has issues in the compatible mode, when
+ * kernel is 64-bit and user space is 32-bit, due to alignment
+ * differences.
+ *
+ * Thus, it's not recommended to retrieve more than one event at a time.
  */
 struct gpioevent_data {
 	__u64 timestamp;

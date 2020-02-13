@@ -843,10 +843,18 @@ static ssize_t lineevent_read(struct file *filep,
 {
 	struct lineevent_state *le = filep->private_data;
 	struct gpioevent_data ge;
+	/* We need sizes of each member to avoid alignment issues below */
+	size_t ts_sz = sizeof(ge.timestamp), id_sz = sizeof(ge.id);
 	size_t ge_sz = sizeof(ge);
 	ssize_t bytes_read = 0;
 	int ret;
 
+	/*
+	 * In compatible mode, when kernel is 64-bit and user space is 32-bit,
+	 * we may not tell what user wanted here when count is bigger than size
+	 * of one event, so, we just assume that user asks for one event.
+	 */
+	ge_sz = in_compat_syscall() ? ts_sz + id_sz : ge_sz;
 	if (count < ge_sz)
 		return -EINVAL;
 
@@ -883,9 +891,23 @@ static ssize_t lineevent_read(struct file *filep,
 			break;
 		}
 
-		if (copy_to_user(buf + bytes_read, &ge, ge_sz))
-			return -EFAULT;
-		bytes_read += ge_sz;
+		if (in_compat_syscall()) {
+			/*
+			 * Due to alignment concerns we have to copy this
+			 * member-by-member. Luckily there are no members
+			 * less than 32-bit.
+			 */
+			if (copy_to_user(buf + bytes_read, &ge.timestamp, ts_sz))
+				return -EFAULT;
+			bytes_read += ts_sz;
+			if (copy_to_user(buf + bytes_read, &ge.id, id_sz))
+				return -EFAULT;
+			bytes_read += id_sz;
+		} else {
+			if (copy_to_user(buf + bytes_read, &ge, ge_sz))
+				return -EFAULT;
+			bytes_read += ge_sz;
+		}
 	} while (count >= bytes_read + ge_sz);
 
 	return bytes_read;
