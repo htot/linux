@@ -836,7 +836,6 @@ static __poll_t lineevent_poll(struct file *filep,
 	return events;
 }
 
-
 static ssize_t lineevent_read(struct file *filep,
 			      char __user *buf,
 			      size_t count,
@@ -844,10 +843,11 @@ static ssize_t lineevent_read(struct file *filep,
 {
 	struct lineevent_state *le = filep->private_data;
 	struct gpioevent_data ge;
+	size_t ge_sz = sizeof(ge);
 	ssize_t bytes_read = 0;
 	int ret;
 
-	if (count < sizeof(ge))
+	if (count < ge_sz)
 		return -EINVAL;
 
 	do {
@@ -883,10 +883,10 @@ static ssize_t lineevent_read(struct file *filep,
 			break;
 		}
 
-		if (copy_to_user(buf + bytes_read, &ge, sizeof(ge)))
+		if (copy_to_user(buf + bytes_read, &ge, ge_sz))
 			return -EFAULT;
-		bytes_read += sizeof(ge);
-	} while (count >= bytes_read + sizeof(ge));
+		bytes_read += ge_sz;
+	} while (count >= bytes_read + ge_sz);
 
 	return bytes_read;
 }
