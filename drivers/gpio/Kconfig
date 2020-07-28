@@ -1449,6 +1449,14 @@ config GPIO_RDC321X
 	  Support for the RDC R321x SoC GPIOs over southbridge
 	  PCI configuration space.
 
+config GPIO_SODAVILLE
+	bool "Intel Sodaville GPIO support"
+	depends on X86 && OF
+	select GPIO_GENERIC
+	select GENERIC_IRQ_CHIP
+	help
+	  Say Y here to support Intel Sodaville GPIO.
+
 endmenu
 
 menu "SPI GPIO expanders"
