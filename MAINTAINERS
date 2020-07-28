@@ -8838,9 +8838,7 @@ F:	drivers/gpio/gpio-*cove.c
 INTEL PMIC MULTIFUNCTION DEVICE DRIVERS
 R:	Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 S:	Maintained
-F:	drivers/mfd/intel_msic.c
 F:	drivers/mfd/intel_soc_pmic*
-F:	include/linux/mfd/intel_msic.h
 F:	include/linux/mfd/intel_soc_pmic*
 
 INTEL PRO/WIRELESS 2100, 2200BG, 2915ABG NETWORK CONNECTION SUPPORT
