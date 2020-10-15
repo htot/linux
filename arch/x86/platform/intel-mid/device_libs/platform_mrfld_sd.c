@@ -34,6 +34,7 @@ mrfld_sdhci_pci_get_data(struct pci_dev *pdev, int slotno)
 
 static int __init mrfld_sd_init(void)
 {
+	return -ENODEV;
 	if (intel_mid_identify_cpu() != INTEL_MID_CPU_CHIP_TANGIER)
 		return -ENODEV;
 

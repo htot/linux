@@ -36,6 +36,7 @@ static int __init mrfld_legacy_rtc_alloc_irq(void)
 
 static int __init mrfld_legacy_rtc_init(void)
 {
+	return -ENODEV;
 	if (intel_mid_identify_cpu() != INTEL_MID_CPU_CHIP_TANGIER)
 		return -ENODEV;
 

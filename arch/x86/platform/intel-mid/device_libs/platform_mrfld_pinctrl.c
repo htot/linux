@@ -31,6 +31,7 @@ static struct platform_device mrfld_pinctrl_device = {
 
 static int __init mrfld_pinctrl_init(void)
 {
+	return -ENODEV;
 	if (intel_mid_identify_cpu() == INTEL_MID_CPU_CHIP_TANGIER)
 		return platform_device_register(&mrfld_pinctrl_device);
 
