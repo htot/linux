@@ -16,8 +16,12 @@
 #include <linux/watchdog.h>
 #include <linux/platform_data/intel-mid_wdt.h>
 
+#include <asm/cpu_device_id.h>
+#include <asm/hw_irq.h>
 #include <asm/intel_scu_ipc.h>
+#include <asm/intel-family.h>
 #include <asm/intel-mid.h>
+#include <asm/io_apic.h>
 
 #define IPC_WATCHDOG 0xf8
 
@@ -118,6 +122,38 @@ static const struct watchdog_ops mid_wdt_ops = {
 	.ping = wdt_ping,
 };
 
+#define TANGIER_EXT_TIMER0_MSI 12
+
+static int tangier_probe(struct platform_device *pdev)
+{
+	struct intel_mid_wdt_pdata *pdata = pdev->dev.platform_data;
+	struct irq_alloc_info info;
+	int gsi = TANGIER_EXT_TIMER0_MSI;
+	int irq;
+
+	/* IOAPIC builds identity mapping between GSI and IRQ */
+	ioapic_set_alloc_attr(&info, cpu_to_node(0), IOAPIC_LEVEL, IOAPIC_POL_HIGH);
+
+	irq = mp_map_gsi_to_irq(gsi, IOAPIC_MAP_ALLOC, &info);
+	if (irq < 0) {
+		dev_warn(&pdev->dev, "can't find interrupt %d in IOAPIC\n", gsi);
+		return irq;
+	}
+
+	pdata->irq = irq;
+	return 0;
+}
+
+static struct intel_mid_wdt_pdata tangier_pdata = {
+	.probe = tangier_probe,
+};
+
+static const struct x86_cpu_id intel_mid_cpu_ids[] = {
+	X86_MATCH_INTEL_FAM6_MODEL(ATOM_SILVERMONT_MID, &tangier_pdata),
+	{}
+};
+MODULE_DEVICE_TABLE(x86cpu, intel_mid_cpu_ids);
+
 static int mid_wdt_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -126,6 +162,13 @@ static int mid_wdt_probe(struct platform_device *pdev)
 	struct mid_wdt *mid;
 	int ret;
 
+	if (!pdata) {
+		const struct x86_cpu_id *id;
+
+		id = x86_match_cpu(intel_mid_cpu_ids);
+		if (id)
+			pdata = (struct intel_mid_wdt_pdata *)id->driver_data;
+	}
 	if (!pdata) {
 		dev_err(dev, "missing platform data\n");
 		return -EINVAL;
