@@ -14,6 +14,7 @@
 #include <linux/interrupt.h>
 #include <linux/regulator/machine.h>
 #include <linux/scatterlist.h>
+#include <linux/sfi.h>
 #include <linux/irq.h>
 #include <linux/export.h>
 #include <linux/notifier.h>
