@@ -23,7 +23,7 @@ config SND_SST_IPC_PCI
 	tristate
 	select SND_SST_IPC
 	# This option controls the PCI-based IPC for HiFi2 platforms
-	#  (Medfield, Merrifield).
+	# (Merrifield).
 
 config SND_SST_IPC_ACPI
 	tristate
