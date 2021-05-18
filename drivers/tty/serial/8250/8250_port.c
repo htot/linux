@@ -2404,6 +2404,13 @@ dont_test_tx_en:
 		if (msg) {
 			dev_warn_ratelimited(port->dev, "%s\n", msg);
 			up->dma = NULL;
+		} else {
+			/*
+			 * change tty_io write() to not split
+			 * large writes into 2K chunks
+			 */
+			set_bit(TTY_NO_WRITE_SPLIT,
+				&port->state->port.tty->flags);
 		}
 	}
 
