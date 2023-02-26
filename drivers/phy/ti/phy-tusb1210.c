@@ -104,6 +104,7 @@ static int tusb1210_power_on(struct phy *phy)
 
 	msleep(TUSB1210_RESET_TIME_MS);
 
+	tusb1210_ulpi_write(tusb, ULPI_SCRATCH, 0xff);
 	/* Restore the optional eye diagram optimization value */
 	tusb1210_ulpi_write(tusb, TUSB1210_VENDOR_SPECIFIC2, tusb->vendor_specific2);
 
