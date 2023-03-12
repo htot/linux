@@ -198,10 +198,7 @@ struct bq24261_charger {
 	struct {
 		struct work_struct work;
 		struct notifier_block nb;
-		struct extcon_specific_cable_nb sdp;
-		struct extcon_specific_cable_nb cdp;
-		struct extcon_specific_cable_nb dcp;
-		struct extcon_specific_cable_nb otg;
+		struct extcon_dev *edev;
 		enum power_supply_type chg_type;
 		bool boost;
 		bool connected;
@@ -815,29 +812,29 @@ static void bq24261_extcon_event_work(struct work_struct *work)
 	bool old_connected = chip->cable.connected;
 
 	/* Determine cable/charger type */
-	if (extcon_get_cable_state(chip->cable.sdp.edev,
-					"SLOW-CHARGER") > 0) {
+	if (extcon_get_state(chip->cable.edev,
+					EXTCON_CHG_USB_SDP) > 0) {
 		chip->cable.connected = true;
 		current_limit = ILIM_500MA;
 		chip->cable.chg_type = POWER_SUPPLY_TYPE_USB;
 		dev_dbg(&chip->client->dev, "USB SDP charger is connected");
-	} else if (extcon_get_cable_state(chip->cable.cdp.edev,
-					"CHARGE-DOWNSTREAM") > 0) {
+	} else if (extcon_get_state(chip->cable.edev,
+					EXTCON_CHG_USB_CDP) > 0) {
 		chip->cable.connected = true;
 		current_limit = ILIM_1500MA;
 		chip->cable.chg_type = POWER_SUPPLY_TYPE_USB_CDP;
 		dev_dbg(&chip->client->dev, "USB CDP charger is connected");
-	} else if (extcon_get_cable_state(chip->cable.dcp.edev,
-					"FAST-CHARGER") > 0) {
+	} else if (extcon_get_state(chip->cable.edev,
+					EXTCON_CHG_USB_DCP) > 0) {
 		chip->cable.connected = true;
 		current_limit = ILIM_1500MA;
 		chip->cable.chg_type = POWER_SUPPLY_TYPE_USB_DCP;
 		dev_dbg(&chip->client->dev, "USB DCP charger is connected");
-	} else if (extcon_get_cable_state(chip->cable.otg.edev,
-					"USB-Host") > 0) {
+	} else if (extcon_get_state(chip->cable.edev,
+					EXTCON_USB_HOST) > 0) {
 		chip->cable.boost = true;
 		chip->cable.connected = true;
-		dev_dbg(&chip->client->dev, "USB-Host cable is connected");
+		dev_dbg(&chip->client->dev, "USB SLOW charger is connected");
 	} else {
 		if (old_connected)
 			dev_dbg(&chip->client->dev, "USB Cable disconnected");
@@ -914,53 +911,22 @@ static int bq24261_handle_extcon_events(struct notifier_block *nb,
 
 static int bq24261_extcon_register(struct bq24261_charger *chip)
 {
-	int ret;
+ 	int ret;
 
 	INIT_WORK(&chip->cable.work, bq24261_extcon_event_work);
 	chip->cable.nb.notifier_call = bq24261_handle_extcon_events;
 
-	ret = extcon_register_interest(&chip->cable.sdp, NULL,
-				"SLOW-CHARGER", &chip->cable.nb);
-	if (ret < 0) {
-		dev_warn(&chip->client->dev,
-				"extcon SDP registration failed(%d)\n", ret);
-		goto sdp_reg_failed;
-	}
+	chip->cable.edev = extcon_get_extcon_dev("mrfld_bcove_pwrsrc");
 
-	ret = extcon_register_interest(&chip->cable.cdp, NULL,
-				"CHARGE-DOWNSTREAM", &chip->cable.nb);
-	if (ret < 0) {
+	ret = devm_extcon_register_notifier_all(&chip->client->dev, chip->cable.edev,
+						&chip->cable.nb);
+	if (ret) {
 		dev_warn(&chip->client->dev,
-				"extcon CDP registration failed(%d)\n", ret);
-		goto cdp_reg_failed;
-	}
-
-	ret = extcon_register_interest(&chip->cable.dcp, NULL,
-				"FAST-CHARGER", &chip->cable.nb);
-	if (ret < 0) {
-		dev_warn(&chip->client->dev,
-				"extcon DCP registration failed(%d)\n", ret);
-		goto dcp_reg_failed;
-	}
-
-	ret = extcon_register_interest(&chip->cable.otg, NULL,
-				"USB-Host", &chip->cable.nb);
-	if (ret < 0) {
-		dev_warn(&chip->client->dev,
-			"extcon USB-Host registration failed(%d)\n", ret);
-		goto otg_reg_failed;
+			 "failed to register cable extcon notifier\n");
+		return -EPROBE_DEFER;
 	}
 
 	return 0;
-
-otg_reg_failed:
-	extcon_unregister_interest(&chip->cable.dcp);
-dcp_reg_failed:
-	extcon_unregister_interest(&chip->cable.cdp);
-cdp_reg_failed:
-	extcon_unregister_interest(&chip->cable.sdp);
-sdp_reg_failed:
-	return -EPROBE_DEFER;
 }
 
 static void bq24261_of_pdata(struct bq24261_charger *chip)
@@ -1136,26 +1102,21 @@ static int bq24261_probe(struct i2c_client *client,
 	return 0;
 
 irq_reg_failed:
-	extcon_unregister_interest(&chip->cable.sdp);
-	extcon_unregister_interest(&chip->cable.cdp);
-	extcon_unregister_interest(&chip->cable.dcp);
-	extcon_unregister_interest(&chip->cable.otg);
+	devm_extcon_unregister_notifier_all(&client->dev, chip->cable.edev,
+						&chip->cable.nb);
 extcon_reg_failed:
 	power_supply_unregister(chip->psy_usb);
 	return ret;
 }
 
-static int bq24261_remove(struct i2c_client *client)
+static void bq24261_remove(struct i2c_client *client)
 {
 	struct bq24261_charger *chip = i2c_get_clientdata(client);
 
 	flush_scheduled_work();
-	extcon_unregister_interest(&chip->cable.sdp);
-	extcon_unregister_interest(&chip->cable.cdp);
-	extcon_unregister_interest(&chip->cable.dcp);
-	extcon_unregister_interest(&chip->cable.otg);
+	devm_extcon_unregister_notifier_all(&client->dev, chip->cable.edev,
+						&chip->cable.nb);
 	power_supply_unregister(chip->psy_usb);
-	return 0;
 }
 
 static const struct i2c_device_id bq24261_id[] = {
