@@ -229,6 +229,16 @@ config I2C_CHT_WC
 	  combined with a FUSB302 Type-C port-controller as such it is advised
 	  to also select CONFIG_TYPEC_FUSB302=m.
 
+config I2C_MRFLD_BC
+	tristate "Intel Merrifield Basin Cove PMIC smbus controller"
+	depends on INTEL_SOC_PMIC_MRFLD
+	help
+	  If you say yes to this option, support will be included for the
+	  SMBus controller found in the Intel Merrifield Basin Cove PMIC
+	  found on some Intel Merrifield systems.
+
+	  Note this controller is hooked up to a TI bq24261 charger-IC.
+
 config I2C_NFORCE2
 	tristate "Nvidia nForce2, nForce3 and nForce4"
 	depends on PCI
