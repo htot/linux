@@ -23,9 +23,12 @@
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
 #include <linux/mfd/intel_soc_pmic.h>
+#include <linux/mfd/intel_soc_pmic_mrfld.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+
+#define PMIC_SRAM_INTR_ADDR 0xFFFFF616
 
 #define MRFLD_BC_I2C_CTRL		0x58
 #define MRFLD_BC_I2C_CTRL_WR		BIT(0)
@@ -49,47 +52,42 @@ struct mrfld_bc_i2c_adap {
 	struct i2c_client *client;
 	u8 irq_mask;
 	u8 old_irq_mask;
+	void __iomem *pmic_intr_map;
 	bool nack;
 	bool done;
 };
 
-static irqreturn_t mrfld_bc_i2c_adap_thread_handler(int id, void *data)
+/* PMIC I2C read-write completion interrupt handler */
+static irqreturn_t mrfld_bc_i2c_adap_handler(int irq, void *data)
 {
 	struct mrfld_bc_i2c_adap *adap = data;
-	int ret, reg;
+	u8 reg;
 
-	/* Read IRQs */
-	ret = regmap_read(adap->regmap, CHT_BC_EXTCHGRIRQ, &reg);
-	if (ret) {
-		dev_err(&adap->adapter.dev, "Error reading extchgrirq reg\n");
-		return IRQ_NONE;
-	}
-
-	reg &= ~adap->irq_mask;
-
-	/*
-	 * Immediately ack IRQs, so that if new IRQs arrives while we're
-	 * handling the previous ones our irq will re-trigger when we're done.
-	 */
-	ret = regmap_write(adap->regmap, CHT_BC_EXTCHGRIRQ, reg);
-	if (ret)
-		dev_err(&adap->adapter.dev, "Error writing extchgrirq reg\n");
-
-	regmap_update_bits(pmic->regmap, BCOVE_MIRQLVL1, BCOVE_LVL1_CHGR, 0);
+	reg = ioread8(adap->pmic_intr_map);
 
 	if (reg & MRFLD_BC_EXTCHGRIRQ_ADAP_IRQMASK) {
 		adap->nack = !!(reg & MRFLD_BC_EXTCHGRIRQ_NACK_IRQ);
 		adap->done = true;
-		wake_up(&adap->wait);
+		return IRQ_WAKE_THREAD;
 	}
 
+	return IRQ_NONE;
+}
+
+static irqreturn_t mrfld_bc_i2c_adap_thread_handler(int id, void *data)
+{
+	struct mrfld_bc_i2c_adap *adap = data;
+
+	regmap_update_bits(adap->regmap, BCOVE_MIRQLVL1, BCOVE_LVL1_CHGR, 0);
+
+	wake_up(&adap->wait);
 	return IRQ_HANDLED;
 }
 
 static u32 mrfld_bc_i2c_adap_master_func(struct i2c_adapter *adap)
 {
 	/* This i2c adapter only supports SMBUS byte transfers */
-	return I2C_FUNC_SMBUS_BYTE_DATA;
+	return I2C_FUNC_SMBUS_BYTE_DATA | I2C_FUNC_SMBUS_READ_BYTE;
 }
 
 static int mrfld_bc_i2c_adap_smbus_xfer(struct i2c_adapter *_adap, u16 addr,
@@ -180,6 +178,11 @@ static int mrfld_bc_i2c_adap_i2c_probe(struct platform_device *pdev)
 
 	init_waitqueue_head(&adap->wait);
 	mutex_init(&adap->irqchip_lock);
+	adap->pmic_intr_map = ioremap(PMIC_SRAM_INTR_ADDR, 8);
+	if (!adap->pmic_intr_map) {
+		dev_err(&pdev->dev, "ioremap Failed\n");
+		return -ENOMEM;
+	}
 	adap->regmap = pmic->regmap;
 	adap->adapter.owner = THIS_MODULE;
 	adap->adapter.class = I2C_CLASS_HWMON;
@@ -193,9 +196,9 @@ static int mrfld_bc_i2c_adap_i2c_probe(struct platform_device *pdev)
 	regmap_update_bits(pmic->regmap, BCOVE_MIRQLVL1, BCOVE_LVL1_CHGR, 0);
 	regmap_update_bits(pmic->regmap, BCOVE_MCHGRIRQ0, adap->irq_mask, 0);
 
-	ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+	ret = devm_request_threaded_irq(&pdev->dev, irq, mrfld_bc_i2c_adap_handler,
 					mrfld_bc_i2c_adap_thread_handler,
-					IRQF_ONESHOT, "PMIC I2C Adapter", adap);
+					IRQF_ONESHOT | IRQF_SHARED, "PMIC I2C Adapter", adap);
 	if (ret)
 		return ret;
 
