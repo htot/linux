@@ -219,6 +219,17 @@ struct bq24261_charger {
 	bool is_charging_enabled;
 };
 
+static struct bq24261_platform_data bq24261_platform_default = {
+	.def_cc = 1000,	/* in mA */
+	.def_cv = 4200,	/* in mV */
+	.iterm = 128,	/* in mA */
+	.max_cc = BQ24261_MAX_CC,	/* in mA */
+	.max_cv = BQ24261_MAX_CV,	/* in mV */
+	.min_temp = BQ24261_MIN_TEMP,	/* in DegC */
+	.max_temp = BQ24261_MAX_TEMP,	/* in DegC */
+	.thermal_sensing = 0
+};
+
 static inline int bq24261_read_reg(struct i2c_client *client, u8 reg)
 {
 	int ret;
@@ -932,68 +943,40 @@ static int bq24261_extcon_register(struct bq24261_charger *chip)
 static void bq24261_of_pdata(struct bq24261_charger *chip)
 {
 	static struct bq24261_platform_data pdata;
-	struct device *dev = &chip->client->dev;
-	int ret, val;
 
-	ret = device_property_read_u32(dev,
-				"ti,charge-current", &val);
-	if (ret < 0)
-		goto of_err;
-	pdata.def_cc = val / 1000;
+	/* "ti,charge-current", &val); */
 
-	ret = device_property_read_u32(dev,
-				"ti,battery-regulation-voltage", &val);
-	if (ret < 0)
-		goto of_err;
-	pdata.def_cv = val / 1000;
+	pdata.def_cc = 500;
 
-	ret = device_property_read_u32(dev,
-				"ti,termination-current", &val);
-	if (ret < 0)
-		goto of_err;
-	pdata.iterm = val / 1000;
+	/* "ti,battery-regulation-voltage", &val); */
+
+	pdata.def_cv = 4200;
+
+	/* "ti,termination-current", &val); */
+
+	pdata.iterm = 128;
 
 	/* get optional parameters */
-	ret = device_property_read_u32(dev,
-				"ti,max-charge-current", &val);
-	if (ret < 0)
-		pdata.max_cc = BQ24261_MAX_CC;
-	else
-		pdata.max_cc = val / 1000;
+	/* "ti,max-charge-current", &val); */
 
-	ret = device_property_read_u32(dev,
-				"ti,max-charge-voltage", &val);
-	if (ret < 0)
-		pdata.max_cc = BQ24261_MAX_CV;
-	else
-		pdata.max_cv = val / 1000;
+	pdata.max_cc = BQ24261_MAX_CC;
 
-	ret = device_property_read_u32(dev,
-				"ti,min-charge-temperature", &val);
-	if (ret < 0)
-		pdata.min_temp = BQ24261_MIN_TEMP;
-	else
-		pdata.min_temp = val;
+	/* "ti,max-charge-voltage", &val); */
+	pdata.max_cc = BQ24261_MAX_CV;
 
-	ret = device_property_read_u32(dev,
-				"ti,max-charge-temperature", &val);
-	if (ret < 0)
-		pdata.max_temp = BQ24261_MAX_TEMP;
-	else
-		pdata.max_temp = val;
+	/* "ti,min-charge-temperature", &val); */
+	pdata.min_temp = BQ24261_MIN_TEMP;
 
-	ret = device_property_read_u32(dev,
-				"ti,thermal-sensing", &val);
-	if (ret < 0)
-		pdata.thermal_sensing = 0;
-	else
-		pdata.thermal_sensing = val;
+
+	/* "ti,max-charge-temperature", &val);*/
+	pdata.max_temp = BQ24261_MAX_TEMP;
+
+	/* "ti,thermal-sensing", &val); */
+	pdata.thermal_sensing = 0;
 
 	chip->pdata = &pdata;
 
 	return;
-of_err:
-	dev_err(dev, "error in getting DT property(%d)\n", ret);
 }
 
 static int bq24261_get_model(struct i2c_client *client,
@@ -1045,8 +1028,7 @@ static int bq24261_probe(struct i2c_client *client,
 		bq24261_of_pdata(chip);
 
 	if (!chip->pdata) {
-		dev_err(&client->dev, "platform data not found");
-		return -ENODEV;
+		chip->pdata = &bq24261_platform_default;
 	}
 
 	i2c_set_clientdata(client, chip);
